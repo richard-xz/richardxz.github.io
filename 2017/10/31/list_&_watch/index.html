@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.3" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.3">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.3" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Kubernetes List&amp;amp;Watch机制解析什么是List， Watch？ List： 获取某一资源类型对应的所有资源列表  Watch： 对某一资源类型进行监控，及时收到资源变化的消息。   为什么需要List 和watch？尽管这里谈到了list和watch，但list其实属于资源增删改查的一部分，无需太多介绍，重要的是watch工能，比如，当你在命令行创建完成一个rc之后，co">
+<meta property="og:type" content="article">
+<meta property="og:title" content="five hundred miles">
+<meta property="og:url" content="https://richardxz.github.io/2017/10/31/list_&_watch/index.html">
+<meta property="og:site_name" content="five hundred miles">
+<meta property="og:description" content="Kubernetes List&amp;amp;Watch机制解析什么是List， Watch？ List： 获取某一资源类型对应的所有资源列表  Watch： 对某一资源类型进行监控，及时收到资源变化的消息。   为什么需要List 和watch？尽管这里谈到了list和watch，但list其实属于资源增删改查的一部分，无需太多介绍，重要的是watch工能，比如，当你在命令行创建完成一个rc之后，co">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2017-10-31T07:34:43.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="five hundred miles">
+<meta name="twitter:description" content="Kubernetes List&amp;amp;Watch机制解析什么是List， Watch？ List： 获取某一资源类型对应的所有资源列表  Watch： 对某一资源类型进行监控，及时收到资源变化的消息。   为什么需要List 和watch？尽管这里谈到了list和watch，但list其实属于资源增删改查的一部分，无需太多介绍，重要的是watch工能，比如，当你在命令行创建完成一个rc之后，co">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.3',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":true},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://richardxz.github.io/2017/10/31/list_&_watch/"/>
+
+
+
+
+
+  <title> | five hundred miles</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">five hundred miles</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://richardxz.github.io/2017/10/31/list_&_watch/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="xiangzheng">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="five hundred miles">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline"></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-10-31T04:33:56-04:00">
+                2017-10-31
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="Kubernetes-List-amp-Watch机制解析"><a href="#Kubernetes-List-amp-Watch机制解析" class="headerlink" title="Kubernetes List&amp;Watch机制解析"></a>Kubernetes List&amp;Watch机制解析</h1><h2 id="什么是List，-Watch？"><a href="#什么是List，-Watch？" class="headerlink" title="什么是List， Watch？"></a>什么是List， Watch？</h2><ul>
+<li><p>List： 获取某一资源类型对应的所有资源列表</p>
+</li>
+<li><p>Watch： 对某一资源类型进行监控，及时收到资源变化的消息。</p>
+</li>
+</ul>
+<h2 id="为什么需要List-和watch？"><a href="#为什么需要List-和watch？" class="headerlink" title="为什么需要List 和watch？"></a>为什么需要List 和watch？</h2><p>尽管这里谈到了list和watch，但list其实属于资源增删改查的一部分，无需太多介绍，重要的是watch工能，比如，当你在命令行创建完成一个rc之后，controller-manger会创建一个rc对象，然后kube-scheduler会根据rc中的内容对pod进行调度，kubelet会根据调度信息创建并运行pod，那么这一切是如何进行的，这三个组件是如何收到对应的消息的，这一切都依赖于watch机制，组件通过对特定资源的变化的分析来采取对应的操作，下面让我们看看List和watch是如何实现的。</p>
+<h2 id="List和watch的实现"><a href="#List和watch的实现" class="headerlink" title="List和watch的实现"></a>List和watch的实现</h2><p>List和Watch的实现都依赖于apiserver，客户端通过访问api server所提供的不同rest api来对资源进行List和watch，资源存放在etcd中，并且请求时还可以附带条件以获得指定资源。其中watch是通过客户端对apiserver订阅消息实现， 是一种长连接的实现方式， 随着连接的保持，一旦etcd中对应watch资源发生变化，apisever就会通知客户端。</p>
+<p>首先，分析对应api 的创建过程，List和Watch实现时是区分资源的，即每一种资源都会有对应的List和Watch api，api创建流程如下图所示，其中行号为我自己手上加过注释的代码行号，可能与github上的有些不一致，大家请注意。下面对具体的函数进行解释。</p>
+<pre><code>// pkg/master/master.go
+
+// 根据配置生成Master（即apiserver）的实例
+func (c completedConfig) New() (*Master, error) {
+if reflect.DeepEqual(c.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
+    return nil, fmt.Errorf(&quot;Master.New() called with empty config.KubeletClientConfig&quot;)
+}
+
+s, err := c.Config.GenericConfig.SkipComplete().New() // completion is done in Complete, no need for a second time
+if err != nil {
+    return nil, err
+}
+
+//打开UI
+if c.EnableUISupport {
+    routes.UIRedirect{}.Install(s.HandlerContainer)
+}
+
+//打开Log
+if c.EnableLogsSupport {
+    routes.Logs{}.Install(s.HandlerContainer)
+}
+
+m := &amp;Master{
+    GenericAPIServer: s,
+}
+
+//配置rest选项
+restOptionsFactory := restOptionsFactory{
+    deleteCollectionWorkers: c.DeleteCollectionWorkers,
+    enableGarbageCollection: c.GenericConfig.EnableGarbageCollection,
+    storageFactory:          c.StorageFactory,
+}
+
+/*
+  根据配置判断是否启用watch cache, 这个地方十分重要, storageDecorator 中包含了cacher的创建方法，关于cacher，后续会讲
+  如果启用了cache,那么apiserver和etcd的交互就会变成 apisever ↔ cache ↔ etcd，
+  如果没有启用cache， apiserver就会直接和etcd交互， 即apisever ↔ etcd
+ */
+if c.EnableWatchCache {
+    restOptionsFactory.storageDecorator = registry.StorageWithCacher // server和etcd之间多了一层cacher
+} else {
+    restOptionsFactory.storageDecorator = generic.UndecoratedStorage // server和etcd之间直接交互
+}
+
+// install legacy rest storage
+// 配置legacy rest storage
+if c.GenericConfig.APIResourceConfigSource.AnyResourcesForVersionEnabled(apiv1.SchemeGroupVersion) {
+    legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
+        StorageFactory:       c.StorageFactory,
+        ProxyTransport:       c.ProxyTransport,
+        KubeletClientConfig:  c.KubeletClientConfig,
+        EventTTL:             c.EventTTL,
+        ServiceIPRange:       c.ServiceIPRange,
+        ServiceNodePortRange: c.ServiceNodePortRange,
+        LoopbackClientConfig: c.GenericConfig.LoopbackClientConfig, // 本地连接配置
+    }
+    /*
+    NewFor 用于生成generic.RESTOptions, restoptions 中包含了decorator 和storageConfig,
+    decorator 对应上文的restOptionsFactory.storageDecorator， 用于确定是否启用cache
+    storageConfig包含了连接etcd的配置
+      */
+
+       // installLegacyAPI 用于api的安装
+    m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
+}
+</code></pre><p>下面继续对InstallLegacyAPI函数进行解析，其中restOptionsFactory.NewFor函数如下：</p>
+<pre><code>func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+storageConfig, err := f.storageFactory.NewConfig(resource)
+if err != nil {
+    glog.Fatalf(&quot;Unable to find storage destination for %v, due to %v&quot;, resource, err.Error())
+}
+
+// 创建restoptions， restOptions中包含sotrageConfig 和Decorator，storageconfig用于连接etcd， Decorator用于决定是否启用cache
+return generic.RESTOptions{
+    StorageConfig:           storageConfig,
+    Decorator:               f.storageDecorator,
+    DeleteCollectionWorkers: f.deleteCollectionWorkers,
+    EnableGarbageCollection: f.enableGarbageCollection,
+    ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
+}
+}
+</code></pre><p>下面进入InstallLeagcyAPI函数，该函数实现了api的安装：</p>
+<pre><code>// 完成api的安装， 可以看到restOptionsGetter对应上文的restOptionsFactory.NewFor
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+    legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter) //重点
+    // apiGroupInfo包含了资源路径path和处理函数handler的对应关系
+    if err != nil {
+        glog.Fatalf(&quot;Error building core storage: %v&quot;, err)
+    }
+
+    if c.EnableCoreControllers {
+        serviceClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+        bootstrapController := c.NewBootstrapController(legacyRESTStorage, serviceClient)
+        if err := m.GenericAPIServer.AddPostStartHook(&quot;bootstrap-controller&quot;, bootstrapController.PostStartHook); err != nil {
+            glog.Fatalf(&quot;Error registering PostStartHook %q: %v&quot;, &quot;bootstrap-controller&quot;, err)
+        }
+    }
+
+         // 根据apigroup完成对应api的安装
+    if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &amp;apiGroupInfo); err != nil {
+        glog.Fatalf(&quot;Error in registering group versions: %v&quot;, err)
+    }
+}
+</code></pre><p>其中legacyRESTStorageProvider.NewLegacyRESTStorage函数十分重要，它的返回值apiGroupInfo则包含了api路径path和对应Storage的映射关系，storage对象用于连接etcd， 下面对其进行解析：</p>
+<pre><code>pkg/registry/core/rest/storage_core.go
+func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
+// 生成资源path和storage（操作etcd）的对应关系
+……….
+podStorage := podetcd.NewStorage(
+    restOptionsGetter(api.Resource(&quot;pods&quot;)), // 其中就带了cacher
+    nodeStorage.KubeletConnectionInfo,
+    c.ProxyTransport,
+    podDisruptionClient,
+)
+………
+     // 用于存放路径path和storage的映射关系
+    restStorageMap := map[string]rest.Storage{
+        &quot;pods&quot;:             podStorage.Pod,
+        &quot;replicationControllers&quot;:        controllerStorage.Controller,
+……….
+apiGroupInfo.VersionedResourcesStorageMap[&quot;v1&quot;] = restStorageMap
+    return restStorage, apiGroupInfo, nil
+</code></pre><p>下面继续对 InstallLegacyAPI函数中的InstallLegacyAPIGroup函数进行解析，该函数实现了api的安装：</p>
+<pre><code>pkg/genericapiserver/genericapiserver.go
+func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
+    if !s.legacyAPIGroupPrefixes.Has(apiPrefix) {
+        return fmt.Errorf(&quot;%q is not in the allowed legacy API prefixes: %v&quot;, apiPrefix, s.legacyAPIGroupPrefixes.List())
+    }
+    // 完成api的注册安装
+    if err := s.installAPIResources(apiPrefix, apiGroupInfo); err != nil {
+        return err
+    }
+</code></pre><p>进入installAPIResources函数：</p>
+<pre><code>func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
+    for _, groupVersion := range apiGroupInfo.GroupMeta.GroupVersions {
+        apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+        if err != nil {
+            return err
+        }
+        if apiGroupInfo.OptionsExternalVersion != nil {
+            apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
+        }
+
+        //完成对应版本的api安装
+        if err := apiGroupVersion.InstallREST(s.HandlerContainer.Container); err != nil {
+            return fmt.Errorf(&quot;Unable to setup API %v: %v&quot;, apiGroupInfo, err)
+        }
+    }
+
+    return nil
+}
+</code></pre><p>其中apiGroupVersion中包含了上文的restStorateMap对象，接下来进入InstallREST函数：</p>
+<pre><code>pkg/apiserver/apiserver.go
+// 注册api及其处理函数
+func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
+    installer := g.newInstaller()
+    ws := installer.NewWebService()
+    // 实现api的安装
+    apiResources, registrationErrors := installer.Install(ws)
+    lister := g.ResourceLister
+    if lister == nil {
+        lister = staticLister{apiResources}
+    }
+    AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
+    container.Add(ws)
+    return utilerrors.NewAggregate(registrationErrors)
+}
+</code></pre><p>继续进入Install函数：</p>
+<pre><code>pkg/apiserver/api_installer.go
+func (a *APIInstaller) Install(ws *restful.WebService) (apiResources []unversioned.APIResource, errors []error) {
+    errors = make([]error, 0)
+
+    proxyHandler := (&amp;ProxyHandler{
+        prefix:     a.prefix + &quot;/proxy/&quot;,
+        storage:    a.group.Storage,
+        serializer: a.group.Serializer,
+        mapper:     a.group.Context,
+    })
+
+    // Register the paths in a deterministic (sorted) order to get a deterministic swagger spec.
+    paths := make([]string, len(a.group.Storage))
+    var i int = 0
+    for path := range a.group.Storage {
+        paths[i] = path
+        i++
+    }
+    sort.Strings(paths)
+    for _, path := range paths {
+         //为每个path注册资源处理器，path对应上文的‘pod’， a.group.Storage[path]对应PodStorage        
+apiResource, err := a.registerResourceHandlers(path, a.group.Storage[path], ws, proxyHandler)
+        if err != nil {
+            errors = append(errors, fmt.Errorf(&quot;error in registering resource: %s, %v&quot;, path, err))
+        }
+        if apiResource != nil {
+            apiResources = append(apiResources, *apiResource)
+        }
+    }
+    return apiResources, errors
+}
+</code></pre><p>可知该函数的主要作用就是将资源路径path和对应的handler通过registerResourceHandlers关联起来，下面对该函数进行分析：</p>
+<pre><code>// 注册资源处理器, 注意storage对应资源对应的storage对象，例如path “pod”就对应Storage podStorage.Pod
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler) (*unversioned.APIResource, error) {
+....
+// what verbs are supported by the storage, used to know what verbs we support per path
+// 判断该api是否支持list和watch操作，并生成对应的list和watch
+lister, isLister := storage.(rest.Lister)
+// 创建watcher, 强转storage为wathcer
+watcher, isWatcher := storage.(rest.Watcher)
+......
+
+    // Add actions at the resource path: /api/apiVersion/resource
+    // 将api支持的操作放入actions对象中
+    actions = appendIf(actions, action{&quot;LIST&quot;, resourcePath, resourceParams, namer, false}, isLister)
+    actions = appendIf(actions, action{&quot;WATCH&quot;, &quot;watch/&quot; + itemPath, nameParams, namer, false}, isWatcher)
+......
+
+for _, action := range actions {
+...
+        switch action.Verb {
+            case &quot;LIST&quot;: // List all resources of a kind.
+                doc := &quot;list objects of kind &quot; + kind
+                if hasSubresource {
+                    doc = &quot;list &quot; + subresource + &quot; of objects of kind &quot; + kind
+                }
+                // List 和watch的处理函数都是ListResource
+                handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+                route := ws.GET(action.Path).To(handler).
+    ………
+            case &quot;WATCH&quot;: // Watch a resource.
+                doc := &quot;watch changes to an object of kind &quot; + kind
+                if hasSubresource {
+                    doc = &quot;watch changes to &quot; + subresource + &quot; of an object of kind &quot; + kind
+                }
+                handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+                route := ws.GET(action.Path).To(handler).
+</code></pre><p>……..<br>由上述函数可知，list和wath对应的handler的处理函数都是ListResource，下面对该函数进行分析，看它实现了什么：</p>
+<pre><code>pkg/apiserver/resthandler.go
+
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
+    // ListResouce返回一个函数，处理客户端的List和Watch请求
+    return func(req *restful.Request, res *restful.Response) {
+…………
+        // 对List和Watch的资源进行过滤，即只关心特定的资源
+        if opts.FieldSelector != nil {
+            fn := func(label, value string) (newLabel, newValue string, err error) {
+                return scope.Convertor.ConvertFieldLabel(scope.Kind.GroupVersion().String(), scope.Kind.Kind, label, value)
+            }
+            if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
+                // TODO: allow bad request to set field causes based on query parameters
+                err = errors.NewBadRequest(err.Error())
+                scope.err(err, res.ResponseWriter, req.Request)
+                return
+            }
+        }
+
+    if (opts.Watch || forceWatch) &amp;&amp; rw != nil {
+        // 如果是watch请求的话就创建一个 watcher， watcher生命周期和每个request相同。,但这个watcher本质上是一个watchchannel，用于接收cachewatcher或者etcdwatcher发过来的事件
+        watcher, err := rw.Watch(ctx, &amp;opts)
+        if err != nil {
+            scope.err(err, res.ResponseWriter, req.Request)
+            return
+        }
+        // TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
+        timeout := time.Duration(0)
+        if opts.TimeoutSeconds != nil {
+            timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+        }
+        if timeout == 0 &amp;&amp; minRequestTimeout &gt; 0 {
+            timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+        }
+        // 实现watch功能
+        serveWatch(watcher, scope, req, res, timeout)
+        return
+    }
+    ………..
+       // 实现List功能
+    result, err := r.List(ctx, &amp;opts)
+</code></pre><p>可知list功能通过r.List函数实现， watch功能通过serveWatch函数实现，下面对serveWatch进行简单分析，List函数各读者可自行解析：</p>
+<pre><code>pkg\apiserver\watch.go
+func serveWatch(watcher watch.Interface, scope RequestScope, req *restful.Request, res *restful.Response, timeout time.Duration) {
+………
+    // 创建一个watchserver， 处理对应的watch事件
+    server := &amp;WatchServer{
+        watching: watcher,
+        scope:    scope,
+
+        useTextFraming:  useTextFraming,
+        mediaType:       mediaType,
+        framer:          framer,
+        encoder:         encoder,
+        embeddedEncoder: embeddedEncoder,
+        fixup: func(obj runtime.Object) {
+            if err := setSelfLink(obj, req, scope.Namer); err != nil {
+                utilruntime.HandleError(fmt.Errorf(&quot;failed to set link for object %v: %v&quot;, reflect.TypeOf(obj), err))
+            }
+        },
+
+        t: &amp;realTimeoutFactory{timeout},
+    }
+    // 提供watch服务，将watch事件写入responseWriter中
+    server.ServeHTTP(res.ResponseWriter, req.Request)
+……
+</code></pre><p>由上述代码可知，对于每一个request请求，都会建立一个WatchServer，由WatchServer.ServeHTTP函数进行请求的处理，下面对该函数进行分析：</p>
+<pre><code>// 提供watch服务，将watch事件返回给客户端
+func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+
+    // 请求结果写入framer中
+    framer := s.framer.NewFrameWriter(w)
+    if framer == nil {
+        // programmer error
+        err := fmt.Errorf(&quot;no stream framing support is available for media type %q&quot;, s.mediaType)
+        utilruntime.HandleError(err)
+        s.scope.err(errors.NewBadRequest(err.Error()), w, req)
+        return
+    }
+     // e用于将结果序列化到ResponseWriter中
+    e := streaming.NewEncoder(framer, s.encoder)
+    // 接收watch事件的chanel，前文所说的对应每个request的watcher其实就是依赖于这个chanel接收到watch事件，然后将该事件返回给客户端
+    ch := s.watching.ResultChan()
+    for {
+        select {
+        case &lt;-cn.CloseNotify():
+            return
+        case &lt;-timeoutCh:
+            return
+        // 将接收到的事件写入event中
+        case event, ok := &lt;-ch:
+            if !ok {
+                // End of results.
+                return
+            }
+
+            // 获取event对应的object对象
+            obj := event.Object
+            s.fixup(obj)
+            if err := s.embeddedEncoder.Encode(obj, buf); err != nil {
+                // unexpected error
+                utilruntime.HandleError(fmt.Errorf(&quot;unable to encode watch object: %v&quot;, err))
+                return
+            }
+
+            // ContentType is not required here because we are defaulting to the serializer
+            // type
+            //将加密结果放入event.Object 中
+            unknown.Raw = buf.Bytes()
+            event.Object = &amp;unknown
+
+            // the internal event will be versioned by the encoder
+            *internalEvent = versioned.InternalEvent(event)
+            // 将事件序列化写入e中，即写入ResponseWriter中， 返回给客户端
+            if err := e.Encode(internalEvent); err != nil {
+                utilruntime.HandleError(fmt.Errorf(&quot;unable to encode watch object: %v (%#v)&quot;, err, e))
+                // client disconnect.
+                return
+</code></pre><p>由上述代码可知，watch功能的实现是通过WatchServer.watching.ResultChan()来接收watch事件，然后将该事件返回给客户端。至此，api的注册即对应list和watch功能的注册都已经分析完毕。但是watch事件的来源我们还没获取到，欲知后事如何，且听下回分解</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/10/28/hello-world/" rel="next" title="Hello World">
+                <i class="fa fa-chevron-left"></i> Hello World
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+      <div id="sidebar-dimmer"></div>
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">xiangzheng</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+
+          </nav>
+
+          
+
+          <div class="links-of-author motion-element">
+            
+          </div>
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#Kubernetes-List-amp-Watch机制解析"><span class="nav-number">1.</span> <span class="nav-text">Kubernetes List&Watch机制解析</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#什么是List，-Watch？"><span class="nav-number">1.1.</span> <span class="nav-text">什么是List， Watch？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#为什么需要List-和watch？"><span class="nav-number">1.2.</span> <span class="nav-text">为什么需要List 和watch？</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#List和watch的实现"><span class="nav-number">1.3.</span> <span class="nav-text">List和watch的实现</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">xiangzheng</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.3</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.3"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.3"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.3"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
