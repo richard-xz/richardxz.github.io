@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next mist use-motion" lang="zh-Hans">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.3" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.3">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.3">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.3" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="k8s," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="&amp;emsp;&amp;emsp;上一篇博客中，我们对list和watch的api的注册流程及对应api的请求处理做了一个解析，但是watch事件的来源，以及cache和非cache两种方式的区别还没有涉及到，下面继续进行分析。在上一篇的末尾，我们知道每一个watch请求都有一个watcher，所有的watch事件就是通过这个watcher返回给客户端的，watcher的创建通过watcher, err :">
+<meta name="keywords" content="k8s">
+<meta property="og:type" content="article">
+<meta property="og:title" content="List&amp;Watch(2)">
+<meta property="og:url" content="https://richardxz.github.io/2017/11/02/list&watch(2)/index.html">
+<meta property="og:site_name" content="five hundred miles">
+<meta property="og:description" content="&amp;emsp;&amp;emsp;上一篇博客中，我们对list和watch的api的注册流程及对应api的请求处理做了一个解析，但是watch事件的来源，以及cache和非cache两种方式的区别还没有涉及到，下面继续进行分析。在上一篇的末尾，我们知道每一个watch请求都有一个watcher，所有的watch事件就是通过这个watcher返回给客户端的，watcher的创建通过watcher, err :">
+<meta property="og:locale" content="zh-Hans">
+<meta property="og:updated_time" content="2017-11-02T11:45:49.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="List&amp;Watch(2)">
+<meta name="twitter:description" content="&amp;emsp;&amp;emsp;上一篇博客中，我们对list和watch的api的注册流程及对应api的请求处理做了一个解析，但是watch事件的来源，以及cache和非cache两种方式的区别还没有涉及到，下面继续进行分析。在上一篇的末尾，我们知道每一个watch请求都有一个watcher，所有的watch事件就是通过这个watcher返回给客户端的，watcher的创建通过watcher, err :">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Mist',
+    version: '5.1.3',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":true},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: '博主'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="https://richardxz.github.io/2017/11/02/list&watch(2)/"/>
+
+
+
+
+
+  <title>List&Watch(2) | five hundred miles</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">five hundred miles</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-about">
+          <a href="/about/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-user"></i> <br />
+            
+            关于
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-tags"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-th"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="https://richardxz.github.io/2017/11/02/list&watch(2)/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="xiangzheng">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="five hundred miles">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">List&Watch(2)</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">发表于</span>
+              
+              <time title="创建于" itemprop="dateCreated datePublished" datetime="2017-11-02T07:40:10-04:00">
+                2017-11-02
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+            <span class="post-category" >
+            
+              <span class="post-meta-divider">|</span>
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">分类于</span>
+              
+              
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/k8s源码分析/" itemprop="url" rel="index">
+                    <span itemprop="name">k8s源码分析</span>
+                  </a>
+                </span>
+
+                
+                
+              
+            </span>
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>&emsp;&emsp;上一篇博客中，我们对list和watch的api的注册流程及对应api的请求处理做了一个解析，但是watch事件的来源，以及cache和非cache两种方式的区别还没有涉及到，下面继续进行分析。在上一篇的末尾，我们知道每一个watch请求都有一个watcher，所有的watch事件就是通过这个watcher返回给客户端的，watcher的创建通过<code>watcher, err := rw.Watch(ctx, &amp;opts)</code>实现，首先告诉大家，当使用cache和不使用cache时对应的rw对象是有所区别的，下面还是顺序的给大家讲一下流程。</p>
+<p>&emsp;&emsp;首先，从启用cache的地方开始，函数如下：</p>
+<pre><code>pkg/master/master.go
+    if c.EnableWatchCache {
+    restOptionsFactory.storageDecorator = registry.StorageWithCacher // server和etcd之间多了一层cacher
+} else {
+    restOptionsFactory.storageDecorator = generic.UndecoratedStorage // server和etcd之间交互
+}
+</code></pre><p>可以看到，启用cache时使用registy.StorageWithCacher, 不使用cache时使用generic.UndecoratedStorage, 它们会以参数的形式传递给后续函数，先看下这两个函数的实现：</p>
+<pre><code>pkg/registry/generic/registry/storage_factory.go
+// 非cache方式对应的Decorator
+func UndecoratedStorage(
+config *storagebackend.Config,
+capacity int,
+objectType runtime.Object,
+resourcePrefix string,
+scopeStrategy rest.NamespaceScopedStrategy,
+newListFunc func() runtime.Object,
+trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+// NewRawStorage 连接etcd
+return NewRawStorage(config)
+}
+
+
+// cache方式对应的Decorator
+// Creates a cacher based given storageConfig.
+func StorageWithCacher(
+storageConfig *storagebackend.Config,
+capacity int,
+objectType runtime.Object,
+resourcePrefix string,
+scopeStrategy rest.NamespaceScopedStrategy,
+newListFunc func() runtime.Object,
+triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+
+//连接etcd，接收etcd中传过来的watch事件
+s, d := generic.NewRawStorage(storageConfig)
+// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
+// Currently it has two layers of same storage interface -- cacher and low level kv.
+ // 生成cacher的配置
+cacherConfig := storage.CacherConfig{
+    CacheCapacity:        capacity,
+    Storage:              s,
+    Versioner:            etcdstorage.APIObjectVersioner{},
+    Type:                 objectType,
+    ResourcePrefix:       resourcePrefix,
+    NewListFunc:          newListFunc,
+    TriggerPublisherFunc: triggerFunc,
+    Codec:                storageConfig.Codec,
+}
+if scopeStrategy.NamespaceScoped() {
+    cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
+        return storage.NamespaceKeyFunc(resourcePrefix, obj)
+    }
+} else {
+    cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
+        return storage.NoNamespaceKeyFunc(resourcePrefix, obj)
+    }
+}
+// 生成cacher
+cacher := storage.NewCacherFromConfig(cacherConfig)
+destroyFunc := func() {
+    cacher.Stop()
+    d()
+}
+
+return cacher, destroyFun
+</code></pre><p>&emsp;&emsp;通过对比上述两个函数可知，它们都调用了NewRawStorage函数，该函数用于创建etcd连接，提前透露一下，在不使用cache的时候，watch事件就是由etcd直接发送过来，而使用cache的时候，watch事件会由cacher传过来，下面仅对启用cache时的watch流程进行解析，可知在StorageWithCacher最后通过NewCacherFromConfig函数生成了cacher对象，让我们进入该函数：</p>
+<pre><code>pkg/storage/cacher.go
+func NewCacherFromConfig(config CacherConfig) *Cacher {
+    // watchCache存放cache
+    watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc)
+    //listerWatcher 连接etcd，接收watch事件
+    listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
+
+    // Give this error when it is constructed rather than when you get the
+    // first watch item, because it&apos;s much easier to track down that way.
+    if obj, ok := config.Type.(runtime.Object); ok {
+        if err := runtime.CheckCodec(config.Codec, obj); err != nil {
+            panic(&quot;storage codec doesn&apos;t seem to match given type: &quot; + err.Error())
+        }
+    }
+
+    cacher := &amp;Cacher{
+        ready:       newReady(),
+        storage:     config.Storage, // 连接etcd
+        objectType:  reflect.TypeOf(config.Type),
+        watchCache:  watchCache,
+        reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0), //将etcd内容同步至watchcache中
+        versioner:   config.Versioner,
+        triggerFunc: config.TriggerPublisherFunc,
+        watcherIdx:  0,
+        // watchers 存放上述对应每个request的watcher
+        watchers: indexedWatchers{
+            allWatchers:   make(map[int]*cacheWatcher),
+            valueWatchers: make(map[string]watchersMap),
+        },
+        // TODO: Figure out the correct value for the buffer size.
+        incoming: make(chan watchCacheEvent, 100),
+        // We need to (potentially) stop both:
+        // - wait.Until go-routine
+        // - reflector.ListAndWatch
+        // and there are no guarantees on the order that they will stop.
+        // So we will be simply closing the channel, and synchronizing on the WaitGroup.
+        stopCh: make(chan struct{}),
+    }
+    watchCache.SetOnEvent(cacher.processEvent)
+    //分发并处理watch event
+    go cacher.dispatchEvents()
+
+    stopCh := cacher.stopCh
+    cacher.stopWg.Add(1)
+    go func() {
+        defer cacher.stopWg.Done()
+        wait.Until(
+            func() {
+                if !cacher.isStopped() {
+                    cacher.startCaching(stopCh)
+                }
+            }, time.Second, stopCh,
+        )
+    }()
+    return cacher
+}
+</code></pre><p>&ensp;&ensp;由上述函数可知cacher对象中包含了watchcache， listerwatcher， watchers三个成员，其中watchcache用于存放cache， listerwatcher用于将etcd中的内容同步给watchcache， watchers用于存放每个request的watcher。并且cacher的初始化过程中调用了cacher.dispatchEvents(), 用于处理watch事件。上文说过registry.StorageWithCacher是一个decorator，那么现在让我们看看它是在哪里被调用的。<br>从上面的代码分析中可以看出，它的调用顺序如下：</p>
+<pre><code>pkg/master/master.go
+func (c completedConfig) New() (*Master, error) {
+    if c.EnableWatchCache {
+        restOptionsFactory.storageDecorator = registry.StorageWithCacher // server和etcd之间多了一层cacher
+    } else {
+        restOptionsFactory.storageDecorator = generic.UndecoratedStorage // server和etcd直接交互
+    }
+m.InstallLegacyAPI(c.Config, restOptionsFactory.NewFor, legacyRESTStorageProvider)
+}
+</code></pre><p>&ensp;&ensp;可知registry.StorageWithCacher是restOptionsFactory的内部成员，然后将restOptionsFactory.NewFor作为参数传递给InstallLegacyAPI函数， 其中NewFor函数如下：</p>
+<pre><code>pkg/master/master.go
+func (f restOptionsFactory) NewFor(resource unversioned.GroupResource) generic.RESTOptions {
+    storageConfig, err := f.storageFactory.NewConfig(resource)
+    if err != nil {
+        glog.Fatalf(&quot;Unable to find storage destination for %v, due to %v&quot;, resource, err.Error())
+    }
+
+    return generic.RESTOptions{
+        StorageConfig:           storageConfig,
+        Decorator:               f.storageDecorator,
+        DeleteCollectionWorkers: f.deleteCollectionWorkers,
+        EnableGarbageCollection: f.enableGarbageCollection,
+        ResourcePrefix:          f.storageFactory.ResourcePrefix(resource),
+    }
+}
+</code></pre><p>可知NewFor用于生成一个RESTOptions对象，该对象的成员中的Decorator对应registry.StorageWithCacher，下面继续分析InstallLegacyAPI函数：</p>
+<pre><code>pkg/master/master.go
+func (m *Master) InstallLegacyAPI(c *Config, restOptionsGetter genericapiserver.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) {
+     // restOptionsGetter对应上文的NewFor
+    legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter) //重点
+    // RESTSTorage 用于操纵etcd中的api object， apiGroupInfo包含了资源路径path和处理函数handler的对应关系
+    if err != nil {
+        glog.Fatalf(&quot;Error building core storage: %v&quot;, err)
+    }
+
+    if c.EnableCoreControllers {
+        serviceClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+        bootstrapController := c.NewBootstrapController(legacyRESTStorage, serviceClient)
+        if err := m.GenericAPIServer.AddPostStartHook(&quot;bootstrap-controller&quot;, bootstrapController.PostStartHook); err != nil {
+            glog.Fatalf(&quot;Error registering PostStartHook %q: %v&quot;, &quot;bootstrap-controller&quot;, err)
+        }
+    }
+
+    // 根据apigroup完成对应api的注册
+    if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &amp;apiGroupInfo); err != nil {
+        glog.Fatalf(&quot;Error in registering group versions: %v&quot;, err)
+    }
+}
+</code></pre><p>其中restOptionsGetter对应NewFor，下面继续对NewLegacyRESTStorage函数进行分析，</p>
+<pre><code>pkg/registry/core/rest/storage_core.go
+func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter genericapiserver.RESTOptionsGetter)….{
+    nodeStorage, err := nodeetcd.NewStorage(restOptionsGetter(api.Resource(&quot;nodes&quot;)), c.KubeletClientConfig, c.ProxyTransport)
+    if err != nil {
+        return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+    }
+    restStorage.NodeRegistry = node.NewRegistry(nodeStorage.Node)
+
+    //podStorage用于连接etcd
+    podStorage := podetcd.NewStorage(
+        restOptionsGetter(api.Resource(&quot;pods&quot;)), // 执行了NewFor函数，返回了一个RESTOptions对象
+        nodeStorage.KubeletConnectionInfo,
+        c.ProxyTransport,
+        podDisruptionClient,
+    )
+
+    // 用于存放路径path和storage的映射关系
+    restStorageMap := map[string]rest.Storage{
+        &quot;pods&quot;:             podStorage.Pod,
+        &quot;pods/attach&quot;:      podStorage.Attach,
+….
+
+    apiGroupInfo.VersionedResourcesStorageMap[&quot;v1&quot;] = restStorageMap
+
+    return restStorage, apiGroupInfo, nil
+}
+</code></pre><p>可知restOptionsGetter（即NewFor函数）作为参数传递给了NewStorage函数，然后通过NewFor函数生成了一个restOption对象，下面对该函数进行分析：</p>
+<pre><code>pkg/registry/core/pod/etcd/etcd.go
+func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
+    prefix := &quot;/&quot; + opts.ResourcePrefix
+
+    newListFunc := func() runtime.Object { return &amp;api.PodList{} }
+
+//opts对应上文的RestOptions对象，它的Decorator成员对应StorageWithCacher函数
+// 所以cacher就是在这里生成的
+    storageInterface, dFunc := opts.Decorator(
+        opts.StorageConfig,
+        cachesize.GetWatchCacheSizeByResource(cachesize.Pods),
+        &amp;api.Pod{},
+        prefix,
+        pod.Strategy,
+        newListFunc,
+        pod.NodeNameTriggerFunc,
+    )
+ // cacher 对象放在store对象中
+    store := &amp;registry.Store{
+        NewFunc:     func() runtime.Object { return &amp;api.Pod{} },
+        NewListFunc: newListFunc,
+        KeyRootFunc: func(ctx api.Context) string {
+            return registry.NamespaceKeyRootFunc(ctx, prefix)
+        },
+        KeyFunc: func(ctx api.Context, name string) (string, error) {
+            return registry.NamespaceKeyFunc(ctx, prefix, name)
+        },
+        ObjectNameFunc: func(obj runtime.Object) (string, error) {
+            return obj.(*api.Pod).Name, nil
+        },
+        PredicateFunc:           pod.MatchPod,
+        QualifiedResource:       api.Resource(&quot;pods&quot;),
+        EnableGarbageCollection: opts.EnableGarbageCollection,
+        DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
+
+        CreateStrategy:      pod.Strategy,
+        UpdateStrategy:      pod.Strategy,
+        DeleteStrategy:      pod.Strategy,
+        ReturnDeletedObject: true,
+
+        Storage:     storageInterface,
+        DestroyFunc: dFunc,
+    }
+
+    statusStore := *store
+    statusStore.UpdateStrategy = pod.StatusStrategy
+
+    return PodStorage{
+        Pod:         &amp;REST{store, proxyTransport},
+        Binding:     &amp;BindingREST{store: store},
+        Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
+        Status:      &amp;StatusREST{store: &amp;statusStore},
+        Log:         &amp;podrest.LogREST{Store: store, KubeletConn: k},
+        Proxy:       &amp;podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+        Exec:        &amp;podrest.ExecREST{Store: store, KubeletConn: k},
+        Attach:      &amp;podrest.AttachREST{Store: store, KubeletConn: k},
+        PortForward: &amp;podrest.PortForwardREST{Store: store, KubeletConn: k},
+    }
+}
+</code></pre><p>所以cacher就在NewStorage函数中生成，然后以xxStorage的成员的形式被返回，以类似”pods”:   podStorage.Pod, 的映射关系存放在apiGroupInfo中。从这里可以知道对应类似“pod”的每一类资源都有一个Stoarge，Storage中包含cacher对象。</p>
+<p>&emsp;&emsp;ok，上面的流程讲完了cacher的生成，下面讲讲cacher在list和watch中的作用。上一篇博客说过，api注册时会通过registerResourceHandlers函数将api路径和处理函数进行绑定，下面对registerResourceHandlers函数进行分析：</p>
+<pre><code>pkg/apiserver/api_installer.go
+// 以‘pod’api为例，参数中的storage对应PodStorage.Pod，它是一个rest.Storage对象
+// 通过上文的分析可知PodStorage.Pod.store.Storage 就是cacher
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, proxyHandler http.Handler)
+{
+// 将cacher转换成Lister和Wathcer
+lister, isLister := storage.(rest.Lister)
+watcher, isWatcher := storage.(rest.Watcher)
+……….
+        case &quot;LIST&quot;: // List all resources of a kind.
+            doc := &quot;list objects of kind &quot; + kind
+            if hasSubresource {
+                doc = &quot;list &quot; + subresource + &quot; of objects of kind &quot; + kind
+            }
+            // List 和watch的处理函数都是ListResource
+            handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+            route := ws.GET(action.Path).To(handler).
+
+…….         
+        case &quot;WATCH&quot;: // Watch a resource.
+            doc := &quot;watch changes to an object of kind &quot; + kind
+            if hasSubresource {
+                doc = &quot;watch changes to &quot; + subresource + &quot; of an object of kind &quot; + kind
+            }
+            handler := metrics.InstrumentRouteFunc(action.Verb, resource, ListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
+            route := ws.GET(action.Path).To(handler).
+}
+</code></pre><p>由上可知list和watch功能的实现都依赖于ListResource函数和lister，watcher，而lister和watcher其实就是cacher，下面对ListResource函数进行分析：</p>
+<pre><code>func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
+    return func(req *restful.Request, res *restful.Response) {
+        // For performance tracking purposes.
+        trace := util.NewTrace(&quot;List &quot; + req.Request.URL.Path)
+
+        w := res.ResponseWriter
+…………..
+opts := api.ListOptions{}
+….....
+        if (opts.Watch || forceWatch) &amp;&amp; rw != nil {
+            // 创建一个 watcher， watcher生命周期和每个request相同。type(rw): rest.Watcher,但这个watcher本质上是一个watchchannel，用于接收cacher发过来的事件
+            watcher, err := rw.Watch(ctx, &amp;opts)
+            if err != nil {
+                scope.err(err, res.ResponseWriter, req.Request)
+                return
+            }
+            // TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
+            timeout := time.Duration(0)
+            if opts.TimeoutSeconds != nil {
+                timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+            }
+            if timeout == 0 &amp;&amp; minRequestTimeout &gt; 0 {
+                timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
+            }
+            //处理watch请求
+            serveWatch(watcher, scope, req, res, timeout)
+            return
+        }
+
+        // Log only long List requests (ignore Watch).
+        defer trace.LogIfLong(500 * time.Millisecond)
+        trace.Step(&quot;About to List from storage&quot;)
+           // 如果是list请求则通过r.List返回结果
+        result, err := r.List(ctx, &amp;opts)
+        if err != nil {
+            scope.err(err, res.ResponseWriter, req.Request)
+            return
+        }
+        trace.Step(&quot;Listing from storage done&quot;)
+        numberOfItems, err := setListSelfLink(result, req, scope.Namer)
+        if err != nil {
+            scope.err(err, res.ResponseWriter, req.Request)
+            return
+        }
+        trace.Step(&quot;Self-linking done&quot;)
+        write(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+        trace.Step(fmt.Sprintf(&quot;Writing http response done (%d items)&quot;, numberOfItems))
+    }
+}
+</code></pre><p>终于，我们在这里又看到了<code>watcher, err := rw.Watch(ctx, &amp;opts)</code>， 从上面代码可知rw就是cacher，所以每个request请求对应的watcher是由cacher生成的。但这个watcher不同于先前说的watcher，先前所说的watcher对应每个api，这个watcher对应每个请求，生命周期随着请求的结束而结束；通过serveWatch(watcher, scope, req, res, timeout)进行wath请求的处理， 让我们先对rw.Watch（cacher.Watch）函数进行分析:<br>    func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate) (watch.Interface, error) {<br>        watchRV, err := ParseWatchResourceVersion(resourceVersion)<br>        if err != nil {<br>            return nil, err<br>        }</p>
+<pre><code>    c.ready.wait()
+
+    // We explicitly use thread unsafe version and do locking ourself to ensure that
+    // no new events will be processed in the meantime. The watchCache will be unlocked
+    // on return from this function.
+    // Note that we cannot do it under Cacher lock, to avoid a deadlock, since the
+    // underlying watchCache is calling processEvent under its lock.
+    c.watchCache.RLock()
+    defer c.watchCache.RUnlock()
+     // 从watchCache中取出要处理的watch事件
+    initEvents, err := c.watchCache.GetAllEventsSinceThreadUnsafe(watchRV)
+    if err != nil {
+        // To match the uncached watch implementation, once we have passed authn/authz/admission,
+        // and successfully parsed a resource version, other errors must fail with a watch event of type ERROR,
+        // rather than a directly returned error.
+        return newErrWatcher(err), nil
+    }
+
+    triggerValue, triggerSupported := &quot;&quot;, false
+    // TODO: Currently we assume that in a given Cacher object, any &lt;predicate&gt; that is
+    // passed here is aware of exactly the same trigger (at most one).
+    // Thus, either 0 or 1 values will be returned.
+    if matchValues := pred.MatcherIndex(); len(matchValues) &gt; 0 {
+        triggerValue, triggerSupported = matchValues[0].Value, true
+    }
+
+    // If there is triggerFunc defined, but triggerSupported is false,
+    // we can&apos;t narrow the amount of events significantly at this point.
+    //
+    // That said, currently triggerFunc is defined only for Pods and Nodes,
+    // and there is only constant number of watchers for which triggerSupported
+    // is false (excluding those issues explicitly by users).
+    // Thus, to reduce the risk of those watchers blocking all watchers of a
+    // given resource in the system, we increase the sizes of buffers for them.
+    chanSize := 10
+    if c.triggerFunc != nil &amp;&amp; !triggerSupported {
+        // TODO: We should tune this value and ideally make it dependent on the
+        // number of objects of a given type and/or their churn.
+        chanSize = 1000
+    }
+
+    c.Lock()
+    defer c.Unlock()
+    forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
+    // 创建watcher,并处理initEvents
+    watcher := newCacheWatcher(watchRV, chanSize, initEvents, filterFunction(key, pred), forget)
+
+    //将watcher添加到c.watchers中
+    c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
+    c.watcherIdx++
+    // 返回watcher
+    return watcher, nil
+}
+</code></pre><p>从上面的过程可以看出，创建watcher主要分为四步，先从cacher.watchCache中取出需要处理的watch事件，然后创建watcher，将watcher添加到cacher.watchers中，最后返回watcher， 先分析newCacheWatcher函数：</p>
+<pre><code>pkg/storage/cacher.go
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []watchCacheEvent, filter filterObjectFunc, forget func(bool)) *cacheWatcher {
+    watcher := &amp;cacheWatcher{
+        input:   make(chan watchCacheEvent, chanSize),
+        result:  make(chan watch.Event, chanSize),
+        done:    make(chan struct{}),
+        filter:  filter,
+        stopped: false,
+        forget:  forget,
+    }
+    go watcher.process(initEvents, resourceVersion)
+    return watcher
+}
+</code></pre><p>可以看出watcher本质上是三条chanel，一条input接收watch事件，对接收到的事件通过process函数进行处理，处理完之后通过result返回给客户（将结果返回给客户的处理过程在serveWatch函数中实现，读者可自行解析）。</p>
+<p>综上，cacher在watch的实现中的作用就是为每个请求创建一个watcher，通过watcher接收watch事件，接下来，让我们看一下cacher中watch功能的实现进行。<br>在cacher的初始化函数NewCacherFromConfig中，<code>go cacher.dispatchEvents()</code> 用于处理watch事件，下面对该函数进行解析：</p>
+<pre><code>pkg/storage/cacher.go
+// 实现对watch事件的分发
+func (c *Cacher) dispatchEvents() {
+    for {
+        select {
+        case event, ok := &lt;-c.incoming:
+            if !ok {
+                return
+            }
+            c.dispatchEvent(&amp;event)
+        case &lt;-c.stopCh:
+            return
+        }
+    }
+}
+</code></pre><p>可以看出，该函数的作用就是将c.incoming通道中的event进行分发，c.incoming接收来自watchCache的event。下面继续解析c.dispatchEvent函数：</p>
+<pre><code>pkg/storage/cacher.go
+func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
+    triggerValues, supported := c.triggerValues(event)
+
+    // TODO: For now we assume we have a given &lt;timeout&gt; budget for dispatching
+    // a single event. We should consider changing to the approach with:
+    // - budget has upper bound at &lt;max_timeout&gt;
+    // - we add &lt;portion&gt; to current timeout every second
+    timeout := time.Duration(250) * time.Millisecond
+
+    c.Lock()
+    defer c.Unlock()
+    // Iterate over &quot;allWatchers&quot; no matter what the trigger function is.
+    for _, watcher := range c.watchers.allWatchers {
+        watcher.add(event, &amp;timeout)
+    }
+    if supported {
+        // Iterate over watchers interested in the given values of the trigger.
+        for _, triggerValue := range triggerValues {
+            for _, watcher := range c.watchers.valueWatchers[triggerValue] {
+                // 发送事件给指定wathcer
+                watcher.add(event, &amp;timeout)
+            }
+        }
+    } else {
+        // supported equal to false generally means that trigger function
+        // is not defined (or not aware of any indexes). In this case,
+        // watchers filters should generally also don&apos;t generate any
+        // trigger values, but can cause problems in case of some
+        // misconfiguration. Thus we paranoidly leave this branch.
+
+        // Iterate over watchers interested in exact values for all values.
+        for _, watchers := range c.watchers.valueWatchers {
+            for _, watcher := range watchers {
+                watcher.add(event, &amp;timeout)
+            }
+        }
+    }
+}
+</code></pre><p>可以看出watcher对event的处理都是通过add函数完成，继续分析add：</p>
+<pre><code>pkg/storage/cacher.go
+func (c *cacheWatcher) add(event *watchCacheEvent, timeout *time.Duration) {
+    // Try to send the event immediately, without blocking.
+    select {
+    case c.input &lt;- *event:
+        return
+    default:
+    }
+
+    // OK, block sending, but only for up to &lt;timeout&gt;.
+    // cacheWatcher.add is called very often, so arrange
+    // to reuse timers instead of constantly allocating.
+    startTime := time.Now()
+
+    t, ok := timerPool.Get().(*time.Timer)
+    if ok {
+        t.Reset(*timeout)
+    } else {
+        t = time.NewTimer(*timeout)
+    }
+    defer timerPool.Put(t)
+
+    select {
+    case c.input &lt;- *event:
+        stopped := t.Stop()
+        if !stopped {
+            // Consume triggered (but not yet received) timer event
+            // so that future reuse does not get a spurious timeout.
+            &lt;-t.C
+        }
+    case &lt;-t.C:
+        // This means that we couldn&apos;t send event to that watcher.
+        // Since we don&apos;t want to block on it infinitely,
+        // we simply terminate it.
+        c.forget(false)
+        c.stop()
+    }
+
+    if *timeout = *timeout - time.Since(startTime); *timeout &lt; 0 {
+        *timeout = 0
+    }
+}
+</code></pre><p>所以add就是将event发送至watcher.input chanel,发送完之后如何处理呢？由前文可知，创建watcher的时候，会通过process函数对initevent进行处理，事实上通过input chanel传输过来的所有event都是由这个函数处理，过程如下：</p>
+<pre><code>pkg/storage/cacher.go
+func (c *cacheWatcher) process(initEvents []watchCacheEvent, resourceVersion uint64) {
+    defer utilruntime.HandleCrash()
+
+    // Check how long we are processing initEvents.
+    // As long as these are not processed, we are not processing
+    // any incoming events, so if it takes long, we may actually
+    // block all watchers for some time.
+    // TODO: From the logs it seems that there happens processing
+    // times even up to 1s which is very long. However, this doesn&apos;t
+    // depend that much on the number of initEvents. E.g. from the
+    // 2000-node Kubemark run we have logs like this, e.g.:
+    // ... processing 13862 initEvents took 66.808689ms
+    // ... processing 14040 initEvents took 993.532539ms
+    // We should understand what is blocking us in those cases (e.g.
+    // is it lack of CPU, network, or sth else) and potentially
+    // consider increase size of result buffer in those cases.
+    const initProcessThreshold = 500 * time.Millisecond
+    startTime := time.Now()
+    for _, event := range initEvents {
+        c.sendWatchCacheEvent(&amp;event)
+    }
+    processingTime := time.Since(startTime)
+    if processingTime &gt; initProcessThreshold {
+        objType := &quot;&lt;null&gt;&quot;
+        if len(initEvents) &gt; 0 {
+            objType = reflect.TypeOf(initEvents[0].Object).String()
+        }
+        glog.V(2).Infof(&quot;processing %d initEvents of %s took %v&quot;, len(initEvents), objType, processingTime)
+    }
+
+    defer close(c.result)
+    defer c.Stop()
+    for {
+        event, ok := &lt;-c.input
+        if !ok {
+            return
+        }
+        // only send events newer than resourceVersion
+        if event.ResourceVersion &gt; resourceVersion {
+            c.sendWatchCacheEvent(&amp;event)
+        }
+    }
+}
+</code></pre><p>可以看出，对于接收到的事件都是通过sendWatchCacheEvent进行处理，过程如下：</p>
+<pre><code>pkg/storage/cacher.go
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
+    curObjPasses := event.Type != watch.Deleted &amp;&amp; c.filter(event.Key, event.Object)
+    oldObjPasses := false
+    if event.PrevObject != nil {
+        oldObjPasses = c.filter(event.Key, event.PrevObject)
+    }
+    if !curObjPasses &amp;&amp; !oldObjPasses {
+        // Watcher is not interested in that object.
+        return
+    }
+
+    object, err := api.Scheme.Copy(event.Object)
+    if err != nil {
+        glog.Errorf(&quot;unexpected copy error: %v&quot;, err)
+        return
+    }
+    var watchEvent watch.Event
+    switch {
+    // 根据curobject和oldobject比较，生成不同的watch事件
+    case curObjPasses &amp;&amp; !oldObjPasses:
+        watchEvent = watch.Event{Type: watch.Added, Object: object}
+    case curObjPasses &amp;&amp; oldObjPasses:
+        watchEvent = watch.Event{Type: watch.Modified, Object: object}
+    case !curObjPasses &amp;&amp; oldObjPasses:
+        watchEvent = watch.Event{Type: watch.Deleted, Object: object}
+    }
+
+    // We need to ensure that if we put event X to the c.result, all
+    // previous events were already put into it before, no matter whether
+    // c.done is close or not.
+    // Thus we cannot simply select from c.done and c.result and this
+    // would give us non-determinism.
+    // At the same time, we don&apos;t want to block infinitely on putting
+    // to c.result, when c.done is already closed.
+
+    // This ensures that with c.done already close, we at most once go
+    // into the next select after this. With that, no matter which
+    // statement we choose there, we will deliver only consecutive
+    // events.
+    select {
+    case &lt;-c.done:
+        return
+    default:
+    }
+
+    select {
+    case c.result &lt;- watchEvent:
+    case &lt;-c.done:
+    }
+}
+</code></pre><p>可以看出，每个event中都带有etcd中某个key对应的新值和旧值，通过两个值的比较将事件分为add，modify，delete三类，封装成watchevent之后发送给c.result通道，再由c.result发送回客户，至此，cacher在watch中的整套流程都已分析完毕。</p>
+<p>由上可知，所有的watch事件都是通过从watchcache中取，那么watchcache又是怎么实现的呢？欲知后事如何，且听下回分解。</p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/k8s/" rel="tag"># k8s</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2017/11/02/list&watch(3)/" rel="next" title="List&Watch(3)">
+                <i class="fa fa-chevron-left"></i> List&Watch(3)
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+      <div id="sidebar-dimmer"></div>
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+
+      <section class="site-overview-wrap sidebar-panel sidebar-panel-active">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">xiangzheng</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-name">日志</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-categories">
+                <a href="/categories/index.html">
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">分类</span>
+                </a>
+              </div>
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                <a href="/tags/index.html">
+                  <span class="site-state-item-count">1</span>
+                  <span class="site-state-item-name">标签</span>
+                </a>
+              </div>
+            
+
+          </nav>
+
+          
+
+          <div class="links-of-author motion-element">
+            
+          </div>
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2017</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">xiangzheng</span>
+
+  
+</div>
+
+
+  <div class="powered-by">由 <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a> 强力驱动</div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">主题 &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Mist</a> v5.1.3</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.3"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.3"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.3"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.3"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
